@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiplayer Lock Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    .shake {
+      animation: shake 0.5s;
+    }
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      50% { transform: translateX(5px); }
+      75% { transform: translateX(-5px); }
+      100% { transform: translateX(0); }
+    }
+    .btn {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      font-size: 1.25rem;
+      font-weight: bold;
+      border-radius: 0.75rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px #ccc;
+    }
+    .btn:hover {
+      background-color: #e5e7eb;
+    }
+    .btn:active {
+      background-color: #d1d5db;
+      transform: translateY(2px);
+      box-shadow: 0 2px #aaa;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+  <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-xl text-center">
+    <h1 class="text-2xl font-bold mb-4">🔒 Multiplayer Lock Game</h1>
+
+    <div id="setup-section">
+      <p class="mb-2 font-medium">Choose difficulty:</p>
+      <div class="flex justify-center gap-4 mb-4">
+        <button onclick="setDifficulty(3)" class="bg-blue-500 text-white px-4 py-2 rounded-xl">Easy</button>
+        <button onclick="setDifficulty(4)" class="bg-yellow-500 text-white px-4 py-2 rounded-xl">Medium</button>
+        <button onclick="setDifficulty(5)" class="bg-red-500 text-white px-4 py-2 rounded-xl">Hard</button>
+      </div>
+
+      <p class="mb-2 font-medium">Enter number of players (2-4):</p>
+      <input type="number" id="player-count" min="2" max="4" class="border p-2 rounded w-16 mb-4" value="2">
+
+      <button onclick="startSetup()" class="bg-green-500 text-white px-6 py-2 rounded-xl">Next</button>
+    </div>
+
+    <div id="player-input-section" class="hidden">
+      <p id="player-prompt" class="mb-2 font-medium"></p>
+      <input type="password" id="secret-input" maxlength="5" class="border p-2 rounded mb-4 text-center" />
+      <button onclick="submitSecret()" class="bg-blue-600 text-white px-4 py-2 rounded-xl">Submit Secret</button>
+    </div>
+
+    <div id="game-section" class="hidden">
+      <h2 class="text-xl font-bold mb-2">Guessing Phase</h2>
+      <p id="turn-info" class="mb-2 font-medium"></p>
+      <div id="guess-display" class="text-2xl font-mono mb-4 border p-2 rounded-xl">_ _ _</div>
+
+      <div class="grid grid-cols-3 gap-2 mb-4">
+        <button class="btn" onclick="addDigit('1')">1</button>
+        <button class="btn" onclick="addDigit('2')">2</button>
+        <button class="btn" onclick="addDigit('3')">3</button>
+        <button class="btn" onclick="addDigit('4')">4</button>
+        <button class="btn" onclick="addDigit('5')">5</button>
+        <button class="btn" onclick="addDigit('6')">6</button>
+        <button class="btn" onclick="addDigit('7')">7</button>
+        <button class="btn" onclick="addDigit('8')">8</button>
+        <button class="btn" onclick="addDigit('9')">9</button>
+      </div>
+
+      <div class="flex justify-center gap-4 mb-4">
+        <button onclick="submitGuess()" class="bg-green-500 text-white px-4 py-2 rounded-xl">Submit</button>
+        <button onclick="clearGuess()" class="bg-gray-300 px-4 py-2 rounded-xl">Clear</button>
+      </div>
+
+      <div id="feedback" class="text-lg font-bold mb-4"></div>
+      <button onclick="location.reload()" id="replay-button" class="hidden bg-purple-600 text-white px-4 py-2 rounded-xl mt-4">Replay</button>
+    </div>
+  </div>
+
+  <script>
+    let digitCount = 3;
+    let playerCount = 2;
+    let secrets = [];
+    let guesses = [];
+    let currentSecretInput = 0;
+    let currentGuess = [];
+    let currentTurn = 0;
+
+    function setDifficulty(level) {
+      digitCount = level;
+    }
+
+    function startSetup() {
+      playerCount = parseInt(document.getElementById('player-count').value);
+      if (playerCount < 2 || playerCount > 4) return alert('Enter 2-4 players.');
+
+      document.getElementById('setup-section').classList.add('hidden');
+      document.getElementById('player-input-section').classList.remove('hidden');
+      promptNextSecret();
+    }
+
+    function promptNextSecret() {
+      document.getElementById('player-prompt').innerText = `Player ${currentSecretInput + 1}, enter your secret ${digitCount}-digit number:`;
+      document.getElementById('secret-input').value = '';
+    }
+
+    function submitSecret() {
+      const val = document.getElementById('secret-input').value;
+      if (!/^\d+$/.test(val) || val.length !== digitCount) {
+        alert(`Must be a ${digitCount}-digit number.`);
+        return;
+      }
+      secrets.push(val);
+      guesses.push([]);
+      currentSecretInput++;
+      if (currentSecretInput < playerCount) {
+        promptNextSecret();
+      } else {
+        document.getElementById('player-input-section').classList.add('hidden');
+        document.getElementById('game-section').classList.remove('hidden');
+        updateTurnInfo();
+        updateDisplay();
+      }
+    }
+
+    function addDigit(d) {
+      if (currentGuess.length < digitCount) {
+        currentGuess.push(d);
+        updateDisplay();
+      }
+    }
+
+    function updateDisplay() {
+      document.getElementById('guess-display').innerText = currentGuess.join(' ') || '_ '.repeat(digitCount).trim();
+    }
+
+    function clearGuess() {
+      currentGuess = [];
+      updateDisplay();
+      document.getElementById('feedback').innerText = '';
+    }
+
+    function countMatchingDigits(secret, guess) {
+      let match = 0;
+      for (let i = 0; i < secret.length; i++) {
+        if (secret[i] === guess[i]) match++;
+      }
+      return match;
+    }
+
+    function submitGuess() {
+      if (currentGuess.length !== digitCount) return;
+      const playerGuessing = currentTurn;
+      const targetPlayer = (currentTurn + 1) % playerCount;
+      const guess = currentGuess.join('');
+      const secret = secrets[targetPlayer];
+      const feedbackEl = document.getElementById('feedback');
+      const display = document.getElementById('guess-display');
+
+      if (guess === secret) {
+        feedbackEl.innerText = `🎉 Player ${playerGuessing + 1} wins!`;
+        feedbackEl.classList.remove('text-red-500');
+        feedbackEl.classList.add('text-green-600');
+        document.getElementById('replay-button').classList.remove('hidden');
+        confetti();
+        return;
+      } else {
+        const match = countMatchingDigits(secret, guess);
+        feedbackEl.innerText = `❌ ${match} digit(s) in the correct position.`;
+        feedbackEl.classList.remove('text-green-600');
+        feedbackEl.classList.add('text-red-500');
+        display.classList.add('shake');
+        setTimeout(() => display.classList.remove('shake'), 500);
+        currentTurn = (currentTurn + 1) % playerCount;
+        currentGuess = [];
+        updateDisplay();
+        updateTurnInfo();
+      }
+    }
+
+    function updateTurnInfo() {
+      document.getElementById('turn-info').innerText = `Player ${currentTurn + 1}, it's your turn to guess Player ${(currentTurn + 1) % playerCount + 1}'s number.`;
+    }
+  </script>
+</body>
+</html>
